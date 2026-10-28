@@ -1,3 +1,7 @@
-/.esphome/**
-
 **/__pycache__/**
+**/.esphome/
+.venv/
+.test-build/
+.pytest_cache/
+**/secrets.yaml
+dist/

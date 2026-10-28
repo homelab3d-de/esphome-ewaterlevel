@@ -1,3 +1,4 @@
+# Modified by homelab3d.de on 2026-10-01. See LICENSE.
 
 import esphome.codegen as cg
 import esphome.config_validation as cv
@@ -25,6 +26,7 @@ from esphome.const import (
 from ._shared import (
     EWaterlevel_schema,
     EWaterlevel_to_code,
+    validate_calibration,
 )
 
 DEPENDENCIES = ["esp32_ble_tracker"]
@@ -74,6 +76,9 @@ CONFIG_SCHEMA = (
     )
     .extend(EWaterlevel_schema)
 )
+
+
+CONFIG_SCHEMA = cv.All(CONFIG_SCHEMA, validate_calibration)
 
 
 async def to_code(config):

@@ -1,0 +1,23 @@
+# Empty/full calibration: replace both example raw values with your measurements.
+packages:
+  tank: !include calibration.yaml
+
+sensor:
+  - platform: copy
+    source_id: water_level_raw
+    id: water_level_percent
+    name: Water Level
+    unit_of_measurement: "%"
+    device_class: ""
+    state_class: measurement
+    entity_category: ""
+    accuracy_decimals: 0
+    filters:
+      - calibrate_linear:
+          method: exact
+          datapoints:
+            - 0.0 -> 0.0
+            - 125.0 -> 100.0
+      - lambda: |-
+          if (!std::isfinite(x)) return NAN;
+          return x < 0.0f ? 0.0f : (x > 100.0f ? 100.0f : x);

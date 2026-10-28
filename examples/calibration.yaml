@@ -1,0 +1,19 @@
+packages:
+  base: !include base.yaml
+
+sensor:
+  - platform: ewaterlevel_ble
+    mac_address: "AA:BB:CC:DD:EE:FF"
+    value:
+      id: water_level_raw
+      name: Raw Value
+      filters:
+        - timeout: 5min
+    battery_voltage:
+      name: Battery Voltage
+      filters:
+        - timeout: 5min
+    battery_level:
+      name: Battery
+      filters:
+        - timeout: 5min

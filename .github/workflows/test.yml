@@ -1,0 +1,35 @@
+name: Component tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install development dependencies
+        run: python -m pip install -r requirements-dev.txt
+      - name: Run packet and calibration tests
+        run: python tools/run_tests.py
+      - name: Prepare example credentials
+        run: cp examples/secrets.yaml.example examples/secrets.yaml
+      - name: Validate examples
+        run: |
+          esphome config examples/discovery.yaml
+          esphome config examples/calibration.yaml
+          esphome config examples/home-assistant.yaml
+          esphome config examples/volume.yaml
+      - name: Build ESP32 firmware
+        run: |
+          esphome compile examples/home-assistant.yaml
+          esphome compile examples/volume.yaml

@@ -1,16 +1,57 @@
-# ESP HOME component for E-Waterlevel by E-Trailer
+# E-Trailer E-Waterlevel for ESPHome
 
-Read E-Trailer E-Waterlevel directly with ESP Home.
+Read E-Trailer E-Waterlevel sensors directly with an ESP32
+and expose their measurements to Home Assistant.
+
+## About this fork
+
+This project is a fork of
+[Fabian-Schmidt/esphome-ewaterlevel](https://github.com/Fabian-Schmidt/esphome-ewaterlevel),
+maintained by homelab3d.de.
+
+The upstream version required changes to work with our ESPHome
+2026.9.1 setup and HW 3.0 / SW 1.0 sensor. This fork continues
+development to address those compatibility issues and simplify setup.
+
+Credit for the original implementation belongs to Fabian Schmidt.
+This fork retains the original GPL-3.0 license.
+
+## Changes in this fork
+
+- Updated Bluetooth scan-result handling for ESPHome 2026.9.1.
+- Replaced deprecated MAC-address formatting calls.
+- Added decoding for the 0x19 advertisement format observed on
+  HW 3.0 / SW 1.0 sensors while retaining the original 0x17 format.
+- Replaced packed-structure casting with explicit packet decoding
+  and checks for packet length and signature.
+- Corrected MAC-address formatting in configuration logs.
+- Added calibration validation and handling of invalid measurements.
+- Added `full_height` to calibrate 100% at the normal full-tank level, independently
+  of pin length, including tanks limited by an overflow.
+- Added simple empty/full percentage calibration and an optional five-point volume
+  example for irregular tanks using ESPHome filters.
+- Added automated decoder and configuration tests, including
+  17 captured sensor advertisements.
+- Added a GitHub Actions workflow for tests and an ESP32 firmware build.
+- Added setup instructions and configuration examples with timeouts
+  for missing sensor readings.
+
+## Guides
+
+- [Setup guide](docs/setup.md)
+- [Optional volume calibration](docs/volume-calibration.md)
+- [Development and testing](docs/testing.md)
+- [German step-by-step tutorial on homelab3d.de](https://homelab3d.de/e-trailer-waterlevel-home-assistant)
 
 ## 1. Find Sensor
 
 1. Run ESP Home with `ewaterlevel_ble` component.
-2. Connect with log and scan for result like `[I][ewaterlevel_ble:058]: E-Waterlevel SENSOR FOUND: AA:BB:CC:DD:EE:FF`.
+2. Connect with log and scan for result like `E-Waterlevel SENSOR FOUND: AA:BB:CC:DD:EE:FF`.
 3. Take note of Sensor Mac address and continue to step 2.
 
 ```yaml
 external_components:
-  - source: github://Fabian-Schmidt/esphome-ewaterlevel
+  - source: github://homelab3d-de/esphome-ewaterlevel@main
     components: ["ewaterlevel_ble"]
 
 esp32_ble_tracker:
@@ -22,110 +63,91 @@ esp32_ble_tracker:
 ewaterlevel_ble:
 ```
 
-[Full find sensor config](findsensor-console.yaml)
+[Discovery example (local checkout)](examples/discovery.yaml)
 
 ## 2. Calibration
 
-Two options are available:
+Install the sensor in its final position and level the vehicle.
+Record its raw `Value` with the tank empty, then at the normal full level limited
+by the overflow. These two points map to 0% and 100% for a simple estimate.
+No 2 cm immersion measurement is required for this method.
 
-- Console calibration for any ESP
-- Display calibration for an ESP with connected display. (Example is `WT32-SC01`)
+For an irregular tank, add about three intermediate points during the same fill,
+for example 10, 20 and 30 L for a tank of about 40 L. Record the actual full quantity.
 
-### Console calibration
-
-1. Run ESP Home with `ewaterlevel_ble` component and mac address. Take note the component is now a sensor.
-2. Connect with log and scan for value like:
-   - `[AA:BB:CC:DD:EE:FF] Time: 28.47, Bat: 2.946V, Value: 0.330`
-3. Measure 3 points:
-   - `min_value` - What value is measured when ~2cm is water is present (the transparent end cap).
-   - `max_value` - What value is measured when the tank is full.
-   - `length`- If you have cut down the pin enter here the length in cm.
-4. Update the value and upload a new version and check that the measurements are correct:
-   - `[AA:BB:CC:DD:EE:FF] Waterlevel: 28.7cm, Percentage: 75.1%`
-
-```yaml
-external_components:
-  - source: github://Fabian-Schmidt/esphome-ewaterlevel
-    components: ["ewaterlevel_ble"]
-
-esp32_ble_tracker:
-  scan_parameters:
-    interval: 10ms
-    window: 10ms
-    active: false
-
-sensor:
-  - platform: ewaterlevel_ble
-    mac_address: "AA:BB:CC:DD:EE:FF"
-    min_value: 10
-    max_value: 125
-```
-
-[Full console calibration config](calibrate-console.yaml)
-
-### Display calibration
-
-This example uses an WT32-SC01.
-
-1. Run ESP Home with `ewaterlevel_ble` component and mac address. Take note the component is now a sensor.
-2. Measure 3 points:
-   - `min_value` - What value is measured when ~2cm is water is present (the transparent end cap).
-   - `max_value` - What value is measured when the tank is full.
-   - `length`- If you have cut down the pin enter here the length in cm.
-4. Update the value and upload a new version and check that the measurements are correct:
-
-![Display calibration with WT32-SC01](img/calibrate-display.jpg)
-
-[Full display calibration config](calibrate-wt32-sc01.yaml)
+- [Setup guide](docs/setup.md)
+- [Raw-value example (local checkout)](examples/calibration.yaml)
+- [Irregular tank calibration](docs/volume-calibration.md)
 
 ## 3. Sensor usage
 
-Run ESP Home with `ewaterlevel_ble` component and mac address and your calibration values (`min_value`, `max_value`, optional `length`).
+Use a raw E-Waterlevel sensor and map its reading to percentage with a copy sensor.
+The MAC address and both raw calibration values below are examples; replace them.
+Keep the external component, Bluetooth, Wi-Fi, API and OTA settings already configured.
 
 ```yaml
-external_components:
-  - source: github://Fabian-Schmidt/esphome-ewaterlevel
-    components: ["ewaterlevel_ble"]
-
-esp32_ble_tracker:
-  scan_parameters:
-    interval: 10ms
-    window: 10ms
-    active: false
-
 sensor:
   - platform: ewaterlevel_ble
     mac_address: "AA:BB:CC:DD:EE:FF"
-    min_value: 10
-    max_value: 125
-    height:
-      name: "Water height"
-    level:
-      name: "Water level"
+    value:
+      id: water_level_raw
+      name: Raw Value
+      filters:
+        - timeout: 5min
     battery_voltage:
-      name: "Battery Voltage"
+      name: Battery Voltage
+      filters:
+        - timeout: 5min
     battery_level:
-      name: "Battery Level"
+      name: Battery
+      filters:
+        - timeout: 5min
+
+  - platform: copy
+    source_id: water_level_raw
+    id: water_level_percent
+    name: Water Level
+    unit_of_measurement: "%"
+    device_class: ""
+    state_class: measurement
+    entity_category: ""
+    accuracy_decimals: 0
+    filters:
+      - calibrate_linear:
+          method: exact
+          datapoints:
+            - 0.0 -> 0.0
+            - 125.0 -> 100.0
+      - lambda: |-
+          if (!std::isfinite(x)) return NAN;
+          return x < 0.0f ? 0.0f : (x > 100.0f ? 100.0f : x);
 ```
 
-[Full example config](example.yaml)
+- [Empty/full example (local checkout)](examples/home-assistant.yaml)
+- [Alternative volume example (local checkout)](examples/volume.yaml)
+
+The original `height` and `level` outputs below remain available for existing users.
+Their height calibration is separate from the raw-value mapping shown above.
+In particular, do not use an empty-tank raw value as the original `min_value`.
 
 Configuration variables:
 ------------------------
 
 - **mac_address** (**Required**, MAC Address): The MAC address of the E-Waterlevel device.
 
-- **min_value** (*Optional*): Value when tank is empty.
+- **min_value** (*Optional*, default `10`): Raw value at 2 cm pin immersion, not at empty. Replace the default with your measurement.
 
-- **max_value** (*Optional*): Value when tank is full.
+- **max_value** (*Optional*, default `125`): Raw value at the immersion configured by `full_height`. Replace the default with your full-tank measurement.
 
-- **length** (*Optional*): If pin cut down the new length in cm.
+- **length** (*Optional*): Actual pin length in cm if shortened; otherwise use the transmitted length. Must be greater than 2 cm and at most 38.3 cm.
 
-- **height** (*Optional*): The raw depth of the liquid for the sensor in cm.
+- **full_height** (*Optional*): Pin immersion in cm at the normal full-tank level, measured from the pin tips. Must be greater than 2 cm and no greater than the pin length (maximum 38.3 cm). If omitted, defaults to the pin length for compatibility with existing full-pin calibration.
+
+- **height** (*Optional*): Calibrated immersion in cm, measured from the pin tips, not the tank floor. Readings below 2 cm are outside the calibrated range.
 
   - All options from [Sensor](https://esphome.io/components/sensor/index.html#config-sensor).
 
-- **level** (*Optional*): The percentage of full for the tank sensor
+- **level** (*Optional*): Height as a percentage of `full_height`, limited to 0–100%. This is not a volume percentage. Use the [volume example](docs/volume-calibration.md) for irregular tanks.
 
   - All options from [Sensor](https://esphome.io/components/sensor/index.html#config-sensor).
 
